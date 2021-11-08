@@ -38,15 +38,48 @@ BufMgr::BufMgr(std::uint32_t bufs)
   clockHand = bufs - 1;
 }
 
-void BufMgr::advanceClock() {}
+/**
+ * This method advances the clockHand to the next bit using modular
+ * arithmetic to ensure the clock remains in the acceptable range
+ */
+void BufMgr::advanceClock() {
+    this->clockHand = (this->clockHand + 1) % this->numBufs
+}
 
-void BufMgr::allocBuf(FrameId& frame) {}
+void BufMgr::allocBuf(FrameId& frame) {
+
+    // find free frame using clock algorithm
+
+    // write page back to disk, dirty if necessary
+
+    // if buffer frame has valid page in it, remove entry from hash table
+
+    // Throw BufferExceededException if all buffer frames are pinned
+}
 
 void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {}
 
 void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {}
 
-void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {}
+/**
+ * Allocate a page within the buffer manager
+ * @param file to be allocated in the buffer manager
+ * @param pageNo is the page number that will be allocated
+ * @param page that will be allocated
+ *
+ * Returns pageNo and page by updating the pointers
+ */
+void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
+    Page*& newPage = file.allocatePage();
+    int frameNo = bufDescTable[clockHand].frameNo;
+    allocBuf(frameNo) // I think this is how I'm supposed to do this...
+
+    // Wrap in try catch
+    this->hashTable.insert(file, pageNo, frameNo);
+    this->hashTable.Set(file, pageNo)
+
+    // set pageNo and page?
+}
 
 void BufMgr::flushFile(File& file) {}
 
