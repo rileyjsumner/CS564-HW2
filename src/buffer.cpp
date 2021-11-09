@@ -118,7 +118,34 @@ void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
     // set pageNo and page?
 }
 
-void BufMgr::flushFile(File& file) {}
+/**
+ * Scans buffer and removes pages belonging to the given file from hashtable and BufDesc.
+ * If page is dirty, write the page back.
+ * Throws PagePinnedException if some page of the file is pinned.
+ * Throws BadBufferException if an invalid page belonging to the file is encountered.
+ */
+void BufMgr::flushFile(File& file) {
+    for (FrameId index = 0; index < numBufs; index++) {
+        // first check that page belongs to the given file
+        if (file == bufDescTable[index].file){
+            // throw exception if page is invalid or pinned
+            if (!bufDescTable[index].valid) {
+                throw BadBufferException(index, bufDescTable[index].dirty, bufDescTable[index].valid, bufDescTable[index].refbit);
+            }
+            else if (bufDescTable[index].pinCnt >= 1) {
+                throw PagePinnedException(file->filename(), bufDescTable[index].pageNo, index)
+            }
+            if (bufDescTable[index].dirty){
+                // if dirty, write page back and set dirty bit to false
+                bufDescTable[index].file -> writePage(bufPool[index]);
+                bufDescTable[index].dirty = false;
+                // then remove page from hashtable and bufDescTable
+                hashtable -> remove(file, bufDescTable[index].pageNo);
+                bufDescTable[index].Clear();
+            }
+        }
+    }
+}
 
 void BufMgr::disposePage(File& file, const PageId PageNo) {}
 
