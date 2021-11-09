@@ -57,7 +57,44 @@ void BufMgr::allocBuf(FrameId& frame) {
     // Throw BufferExceededException if all buffer frames are pinned
 }
 
-void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {}
+/**
+ * Reads the given page from the file into a frame and returns the pointer to the page.
+ * If the requested page is already present in the buffer pool, the pointer to that frame is returned.
+ * Otherwise, a new frame is allocated from the buffer pool for reading the page .
+ * @param file to be allocated in the buffer manager
+ * @param pageNo is the page number that will be allocated
+ * @param page that will be allocated
+ *
+ * Returns the pointer to the page being retrieved
+ */
+void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
+    
+    int frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
+    bool isThrown = false; // default value is false, made true if exception is thrown
+    
+    // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
+    try {
+        // fetch pointer to page we're trying to read
+        hashTable->lookup(file, pageNo, frameId);
+    } catch (HashNotFoundException err) {
+        // new frame is allocated from the buffer pool for reading page not present
+        allocBuf(frameId);
+        Page pageTemp = file.readPage(pageNo);
+        bufPool[frameId] = pageTemp;
+        this->hashTable.insert(file, pageNo, frameId);
+        bufDescTable[frameId].Set(file, pageNo);
+        isThrown = true; // change isThrown to true
+    }
+    
+    if(!isThrown) {
+        // increase pin count by 1 and change refbit to true if this requested page is already present in the buffer pool
+        bufDescTable[frameId].pinCnt++;
+        bufDescTable[frameId].refbit = true;
+    }
+    
+    // return pointer to the page being retrieved
+    page = &bufPool[frameId];
+}
 
 void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {}
 
