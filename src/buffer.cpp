@@ -128,12 +128,20 @@ void BufMgr::flushFile(File& file) {
     for (FrameId index = 0; index < numBufs; index++) {
         // first check that page belongs to the given file
         if (file == bufDescTable[index].file){
-            // throw exception if page is invalid
-            if (bufDescTable[index].valid == 0) {
+            // throw exception if page is invalid or pinned
+            if (!bufDescTable[index].valid) {
                 throw BadBufferException(index, bufDescTable[index].dirty, bufDescTable[index].valid, bufDescTable[index].refbit);
             }
             else if (bufDescTable[index].pinCnt >= 1) {
-                throw PagePinnedException(file->filename(), bufDescTable[index].pageNN)
+                throw PagePinnedException(file->filename(), bufDescTable[index].pageNo, index)
+            }
+            if (bufDescTable[index].dirty){
+                // if dirty, write page back and set dirty bit to false
+                bufDescTable[index].file -> writePage(bufPool[index]);
+                bufDescTable[index].dirty = false;
+                // then remove page from hashtable and bufDescTable
+                hashtable -> remove(file, bufDescTable[index].pageNo);
+                bufDescTable[index].Clear();
             }
         }
     }
