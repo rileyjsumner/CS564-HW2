@@ -135,14 +135,15 @@ void BufMgr::flushFile(File& file) {
                 throw BadBufferException(index, bufDescTable[index].dirty, bufDescTable[index].valid, bufDescTable[index].refbit);
             }
             else if (bufDescTable[index].pinCnt >= 1) {
-                throw PagePinnedException(file->filename(), bufDescTable[index].pageNo, index)
+                throw PagePinnedException(file -> filename(), bufDescTable[index].pageNo, index)
             }
+
             if (bufDescTable[index].dirty){
                 // if dirty, write page back and set dirty bit to false
                 bufDescTable[index].file -> writePage(bufPool[index]);
                 bufDescTable[index].dirty = false;
                 // then remove page from hashtable and bufDescTable
-                hashtable -> remove(file, bufDescTable[index].pageNo);
+                hashTable -> remove(file, bufDescTable[index].pageNo);
                 bufDescTable[index].Clear();
             }
         }
@@ -157,18 +158,17 @@ void BufMgr::flushFile(File& file) {
  * @param PageNo page number of the page to be deleted
  */
 void BufMgr::disposePage(File& file, const PageId PageNo) {
-    FrameId frameId;
+    FrameId frameId; // stores frame ID from lookup call
     try{
-        hashTable -> lookup(file, PageNo, frameNo);
+        hashTable -> lookup(file, PageNo, frameId);
         // page is in the buffer pool, now free and remove
         bufDescTable[frameId].Clear();
-        hashtable -> remove(file, PageNo);
-        // lastly delete page from file
-        file -> deletePage(PageNo);
+        hashTable -> remove(file, PageNo);
     } catch(HashNotFoundException e){ //  page to be deleted is not allocated a frame in the buffer pool
         // no need to throw exception if the hash is not found
     }
-
+    // lastly delete page from file
+    file -> deletePage(PageNo);
 }
 
 void BufMgr::printSelf(void) {
