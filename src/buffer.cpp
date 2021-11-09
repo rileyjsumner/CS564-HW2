@@ -121,8 +121,10 @@ void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
 /**
  * Scans buffer and removes pages belonging to the given file from hashtable and BufDesc.
  * If page is dirty, write the page back.
- * Throws PagePinnedException if some page of the file is pinned.
- * Throws BadBufferException if an invalid page belonging to the file is encountered.
+ *
+ * @param file file to be flushed
+ * @throws PagePinnedException if some page of the file is pinned.
+ * @throws BadBufferException if an invalid page belonging to the file is encountered.
  */
 void BufMgr::flushFile(File& file) {
     for (FrameId index = 0; index < numBufs; index++) {
@@ -147,7 +149,27 @@ void BufMgr::flushFile(File& file) {
     }
 }
 
-void BufMgr::disposePage(File& file, const PageId PageNo) {}
+/**
+ * Deletes a particular page from file.
+ * If page is allocated a frame in the buffer pool, also frees the frame and removes entry from hashtable
+ *
+ * @param file file that the page is found in
+ * @param PageNo page number of the page to be deleted
+ */
+void BufMgr::disposePage(File& file, const PageId PageNo) {
+    FrameId frameId;
+    try{
+        hashTable -> lookup(file, PageNo, frameNo);
+        // page is in the buffer pool, now free and remove
+        bufDescTable[frameId].Clear();
+        hashtable -> remove(file, PageNo);
+        // lastly delete page from file
+        file -> deletePage(PageNo);
+    } catch(HashNotFoundException e){ //  page to be deleted is not allocated a frame in the buffer pool
+        // no need to throw exception if the hash is not found
+    }
+
+}
 
 void BufMgr::printSelf(void) {
   int validFrames = 0;
