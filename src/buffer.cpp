@@ -81,7 +81,7 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
         allocBuf(frameId);
         Page pageTemp = file.readPage(pageNo);
         bufPool[frameId] = pageTemp;
-        this->hashTable.insert(file, pageNo, frameId);
+        hashTable->insert(file, pageNo, frameId);
         bufDescTable[frameId].Set(file, pageNo);
         isThrown = true; // change isThrown to true
     }
@@ -96,7 +96,42 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
     page = &bufPool[frameId];
 }
 
-void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {}
+/**
+ * Unpin a page from memory since it is no longer required for it to remain in memory.
+ *
+ * @param file to be accessed in the buffer manager
+ * @param pageNo is the page number of the page we're trying to unpin
+ * @param dirty  if we have to marked the unpinned page as dirty, we set this to true; false otherwise
+ * @throws PageNotPinnedException thrown if the page's pin count is already 0
+ */
+void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
+    
+    int frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
+    bool isThrown = false;// default value is false, made true if exception is thrown
+    
+    // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
+    try {
+        // fetch pointer to page we're trying to unpin
+        hashTable->lookup(file, pageNo, frameId);
+    } catch(HashNotFoundException e) {
+        // page not found, we indicate that an exception has been thrown to run appropriate code accordingly
+        isThrown = true; // set isThrown to true
+    }
+    
+    // only runs if the suggested page to unpin exists, otherwise the function terminates here
+    if(!isThrown) {
+        // if page isn't pinned, throw PageNotPinnedException...
+        if(bufDescTable[frameId].pinCnt == 0) {
+            throw PageNotPinnedException("Selected page is not pinned (has pinCnt == 0).", bufDescTable[frameId].pageNo, frameId);
+        }
+        // ...Otherwise, decrease the page's pin count by 1 and check if dirty bit should be set to true
+        else {
+            bufDescTable[frameId].pinCnt--;
+            if(dirty)
+                bufDescTable[frameId].dirty = true;
+        }
+    }
+}
 
 /**
  * Allocate a page within the buffer manager
