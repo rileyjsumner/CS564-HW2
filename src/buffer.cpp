@@ -16,6 +16,7 @@
 #include "exceptions/hash_not_found_exception.h"
 #include "exceptions/page_not_pinned_exception.h"
 #include "exceptions/page_pinned_exception.h"
+#include "exceptions/insufficient_space_exception.h"
 
 namespace badgerdb {
 
@@ -46,11 +47,42 @@ void BufMgr::advanceClock() {
     this->clockHand = (this->clockHand + 1) % this->numBufs
 }
 
+/**
+ * Allocate space in the buffer manager to place a frame
+ * @param frame to be placed in the buffer manager
+ */
 void BufMgr::allocBuf(FrameId& frame) {
 
     // find free frame using clock algorithm
-
-    // write page back to disk, dirty if necessary
+    bool isAllocated = false;
+    while(!isAllocated) {
+        // check if valid
+        if(bufDescTable[this->clockHand].valid) {
+            // is refbit set?
+            if(bufDescTable[this->clockHand].refbit) {
+                // clear refbit
+                bufDescTable[this->clockHand].refbit = false;
+            } else {
+                // is page pinned?
+                if(bufDescTable[this->clockHand].pinCnt > 0) { // is this how I do this?
+                    this->advanceClock();
+                } else {
+                    // dirty bit set?
+                    if(bufDescTable[this->clockHand].dirty) {
+                        // flush page
+                        flushFile(bufDescTable[this->clockHand].file);
+                    }
+                    // Call Set on frame
+                    bufDescTable[this->clockHand].Set(bufDescTable[this->clockHand].file, bufDescTable[this->clockHand].pageNo);
+                    isAllocated = true;
+                }
+            }
+        } else {
+            // Call Set on frame
+            bufDescTable[this->clockHand].Set(bufDescTable[this->clockHand].file, bufDescTable[this->clockHand].pageNo);
+            isAllocated = true;
+        }
+    }
 
     // if buffer frame has valid page in it, remove entry from hash table
 
@@ -111,11 +143,19 @@ void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
     int frameNo = bufDescTable[clockHand].frameNo;
     allocBuf(frameNo) // I think this is how I'm supposed to do this...
 
-    // Wrap in try catch
-    this->hashTable.insert(file, pageNo, frameNo);
+    try {
+        this->hashTable.insert(file, pageNo, frameNo);
+    } catch(InsufficentSpaceException e) {
+
+    } catch(Exception e) {
+        e.printStackTrace();
+    }
+
     this->hashTable.Set(file, pageNo)
 
     // set pageNo and page?
+    pageNo = &bufPool[frameNo].pageNo;
+    page = &bufPool[frameNo];
 }
 
 /**
