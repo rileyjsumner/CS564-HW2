@@ -55,38 +55,41 @@ void BufMgr::allocBuf(FrameId& frame) {
 
     // find free frame using clock algorithm
     bool isAllocated = false;
+    num_frames_checked = 0;
     while(!isAllocated) {
-        // check if valid
-        if(bufDescTable[this->clockHand].valid) {
-            // is refbit set?
-            if(bufDescTable[this->clockHand].refbit) {
-                // clear refbit
-                bufDescTable[this->clockHand].refbit = false;
-            } else {
-                // is page pinned?
-                if(bufDescTable[this->clockHand].pinCnt > 0) { // is this how I do this?
-                    this->advanceClock();
-                } else {
-                    // dirty bit set?
-                    if(bufDescTable[this->clockHand].dirty) {
-                        // flush page
-                        flushFile(bufDescTable[this->clockHand].file);
-                    }
-                    // Call Set on frame
-                    bufDescTable[this->clockHand].Set(bufDescTable[this->clockHand].file, bufDescTable[this->clockHand].pageNo);
-                    isAllocated = true;
-                }
+        // increment clock and number of frames checked every iteration
+        advanceClock();
+        num_frames_checked += 1;
+        // check if we have searched all the buffer frames, throw exception if we have not gotten an allocated frame
+        if (num_frames_checked > numBufs) {
+            throw BufferExceededException();
+        }
+        // check if the current page is valid
+        if (bufDescTable[clockHand].valid) {
+            if (bufDescTable[clockHand].refbit) {
+                bufDescTable[clockHand].refbit = false;
+                continue;
             }
-        } else {
-            // Call Set on frame
-            bufDescTable[this->clockHand].Set(bufDescTable[this->clockHand].file, bufDescTable[this->clockHand].pageNo);
+            if (bufDescTable[clockHand].pinCnt >= 1) {
+                continue;
+            }
+            else {
+                isAllocated = true;
+            }
+        }
+        else { // if page is invalid, set up buffer frame and use it
             isAllocated = true;
         }
     }
 
-    // if buffer frame has valid page in it, remove entry from hash table
+    // check if the frame chosen for allocation is dirty
+    if (bufDescTable[clockHand].dirty) {
+        bufDescTable[clockHand].file -> writePage(bufPool[clockHand])
+    }
 
-    // Throw BufferExceededException if all buffer frames are pinned
+    // set up frame and return the frame number
+    bufDescTable[clockHand].Set(bufDescTable[clockHand].file, bufDescTable[clockHand].pageNo);
+    frame  = bufDescTable[clockHand].frameNo;
 }
 
 /**
