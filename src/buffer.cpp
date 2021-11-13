@@ -174,23 +174,31 @@ void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
  * Returns pageNo and page by updating the pointers
  */
 void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
-    Page*& newPage = file.allocatePage();
-    int frameNo = bufDescTable[clockHand].frameNo;
-    allocBuf(frameNo) // I think this is how I'm supposed to do this...
+
+    // allocate the new page and then get the page number from it
+    Page newPage = file -> allocatePage();
+    pageNo = newPage -> page_number();
+
+    // create frameId store frame number returned from allocation in buffer
+    FrameId frameNo;
+    allocBuf(frameNo) ;// I think this is how I'm supposed to do this...
+
+    // add the page in the proper buffer frame and set the page pointer to this new page in the buffer
+    bufPool[frameNo] = newPage;
+    page = &newPage;
+
+    // call set function to set up new frame in buffer
+    bufDescTable[frameNo].Set(file, pageNo);
+
+    //finally insert into hashtable, catching any exceptions
 
     try {
-        this->hashTable.insert(file, pageNo, frameNo);
-    } catch(InsufficentSpaceException e) {
-
-    } catch(Exception e) {
+        hashTable -> insert(file, pageNo, frameNo);
+    } catch (InsufficientSpaceException space_e) {
+        // do nothing if insufficient space
+    } catch (Exception e) {
         e.printStackTrace();
     }
-
-    this->hashTable.Set(file, pageNo)
-
-    // set pageNo and page?
-    pageNo = &bufPool[frameNo].pageNo;
-    page = &bufPool[frameNo];
 }
 
 /**
@@ -218,9 +226,11 @@ void BufMgr::flushFile(File& file) {
                 bufDescTable[index].file -> writePage(bufPool[index]);
                 bufDescTable[index].dirty = false;
                 // then remove page from hashtable and bufDescTable
-                hashTable -> remove(file, bufDescTable[index].pageNo);
-                bufDescTable[index].Clear();
             }
+
+            //finally remove page from hashtable and the bufdesctable
+            hashTable -> remove(file, bufDescTable[index].pageNo);
+            bufDescTable[index].Clear();
         }
     }
 }
