@@ -143,7 +143,7 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
  */
 void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
     
-    FrameId frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
+    FrameId frameId; // fetch the current frame Id
     bool isThrown = false;// default value is false, made true if exception is thrown
 
     // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
