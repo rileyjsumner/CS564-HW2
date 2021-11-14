@@ -174,19 +174,19 @@ void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
  * Returns pageNo and page by updating the pointers
  */
 void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
-    Page*& newPage = file.allocatePage();
+    Page*& newPage = file->allocatePage();
     int frameNo = bufDescTable[clockHand].frameNo;
     allocBuf(frameNo) // I think this is how I'm supposed to do this...
 
     try {
-        this->hashTable.insert(file, pageNo, frameNo);
+        this->bufDescTable[this->clockHand].insert(file, pageNo, frameNo);
     } catch(InsufficentSpaceException e) {
 
     } catch(Exception e) {
         e.printStackTrace();
     }
 
-    this->hashTable.Set(file, pageNo)
+    this->bufDescTable[this->clockHand].Set(file, pageNo)
 
     // set pageNo and page?
     pageNo = &bufPool[frameNo].pageNo;
