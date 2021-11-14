@@ -44,7 +44,7 @@ BufMgr::BufMgr(std::uint32_t bufs)
  * arithmetic to ensure the clock remains in the acceptable range
  */
 void BufMgr::advanceClock() {
-    this->clockHand = (this->clockHand + 1) % this->numBufs
+    this->clockHand = (this->clockHand + 1) % this->numBufs;
 }
 
 /**
@@ -55,13 +55,13 @@ void BufMgr::allocBuf(FrameId& frame) {
 
     // find free frame using clock algorithm
     bool isAllocated = false;
-    num_frames_checked = 0;
+    uint32_t num_frames_checked = 0;
+
     while(!isAllocated) {
         // increment clock and number of frames checked every iteration
         advanceClock();
-        num_frames_checked += 1;
         // check if we have searched all the buffer frames, throw exception if we have not gotten an allocated frame
-        if (num_frames_checked > numBufs) {
+        if (num_frames_checked == numBufs) {
             throw BufferExceededException();
         }
         // check if the current page is valid
@@ -80,11 +80,12 @@ void BufMgr::allocBuf(FrameId& frame) {
         else { // if page is invalid, set up buffer frame and use it
             isAllocated = true;
         }
+        num_frames_checked += 1;
     }
 
     // check if the frame chosen for allocation is dirty
     if (bufDescTable[clockHand].dirty) {
-        bufDescTable[clockHand].file -> writePage(bufPool[clockHand])
+        bufDescTable[clockHand].file.writePage(bufPool[clockHand]); // here
     }
 
     // set up frame and return the frame number
@@ -104,19 +105,20 @@ void BufMgr::allocBuf(FrameId& frame) {
  */
 void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
     
-    int frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
+    FrameId frameId; // fetch the current frame Id
     bool isThrown = false; // default value is false, made true if exception is thrown
     
     // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
     try {
         // fetch pointer to page we're trying to read
-        hashTable->lookup(file, pageNo, frameId);
-    } catch (HashNotFoundException err) {
+        hashTable.lookup(file, pageNo, frameId); // here
+    } catch (HashNotFoundException const&) {
+
         // new frame is allocated from the buffer pool for reading page not present
         allocBuf(frameId);
         Page pageTemp = file.readPage(pageNo);
         bufPool[frameId] = pageTemp;
-        hashTable->insert(file, pageNo, frameId);
+        hashTable.insert(file, pageNo, frameId); // here
         bufDescTable[frameId].Set(file, pageNo);
         isThrown = true; // change isThrown to true
     }
@@ -141,14 +143,14 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
  */
 void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
     
-    int frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
+    FrameId frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
     bool isThrown = false;// default value is false, made true if exception is thrown
-    
+
     // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
     try {
         // fetch pointer to page we're trying to unpin
-        hashTable->lookup(file, pageNo, frameId);
-    } catch(HashNotFoundException e) {
+        hashTable.lookup(file, pageNo, frameId); // here
+    } catch(HashNotFoundException const&) {
         // page not found, we indicate that an exception has been thrown to run appropriate code accordingly
         isThrown = true; // set isThrown to true
     }
@@ -179,8 +181,8 @@ void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
 void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
 
     // allocate the new page and then get the page number from it
-    Page newPage = file -> allocatePage();
-    pageNo = newPage -> page_number();
+    Page newPage = file.allocatePage(); // here
+    pageNo = newPage.page_number(); // here
 
     // create frameId store frame number returned from allocation in buffer
     FrameId frameNo;
@@ -188,7 +190,7 @@ void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
 
     // add the page in the proper buffer frame and set the page pointer to this new page in the buffer
     bufPool[frameNo] = newPage;
-    page = &newPage;
+    page = &bufPool[frameNo];
 
     // call set function to set up new frame in buffer
     bufDescTable[frameNo].Set(file, pageNo);
@@ -196,11 +198,9 @@ void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
     //finally insert into hashtable, catching any exceptions
 
     try {
-        hashTable -> insert(file, pageNo, frameNo);
-    } catch (InsufficientSpaceException space_e) {
+        hashTable.insert(file, pageNo, frameNo); // here
+    } catch (InsufficientSpaceException const&) {
         // do nothing if insufficient space
-    } catch (Exception e) {
-        e.printStackTrace();
     }
 }
 
@@ -221,19 +221,19 @@ void BufMgr::flushFile(File& file) {
                 throw BadBufferException(index, bufDescTable[index].dirty, bufDescTable[index].valid, bufDescTable[index].refbit);
             }
             else if (bufDescTable[index].pinCnt >= 1) {
-                throw PagePinnedException(file -> filename(), bufDescTable[index].pageNo, index)
+                throw PagePinnedException(file.filename(), bufDescTable[index].pageNo, index); // here
             }
 
             if (bufDescTable[index].dirty){
                 // if dirty, write page back and set dirty bit to false
-                bufDescTable[index].file -> writePage(bufPool[index]);
+                bufDescTable[index].file.writePage(bufPool[index]); // here
                 bufDescTable[index].dirty = false;
                 // then remove page from hashtable and bufDescTable
             }
 
             //finally remove page from hashtable and the bufdesctable
-            hashTable -> remove(file, bufDescTable[index].pageNo);
-            bufDescTable[index].Clear();
+            hashTable.remove(file, bufDescTable[index].pageNo); // here
+            bufDescTable[index].clear();
         }
     }
 }
@@ -248,15 +248,15 @@ void BufMgr::flushFile(File& file) {
 void BufMgr::disposePage(File& file, const PageId PageNo) {
     FrameId frameId; // stores frame ID from lookup call
     try{
-        hashTable -> lookup(file, PageNo, frameId);
+        hashTable.lookup(file, PageNo, frameId); // here
         // page is in the buffer pool, now free and remove
-        bufDescTable[frameId].Clear();
-        hashTable -> remove(file, PageNo);
-    } catch(HashNotFoundException e){ //  page to be deleted is not allocated a frame in the buffer pool
+        bufDescTable[frameId].clear();
+        hashTable.remove(file, PageNo); // here
+    } catch(HashNotFoundException const&){ //  page to be deleted is not allocated a frame in the buffer pool
         // no need to throw exception if the hash is not found
     }
     // lastly delete page from file
-    file -> deletePage(PageNo);
+    file.deletePage(PageNo); // here
 }
 
 void BufMgr::printSelf(void) {
