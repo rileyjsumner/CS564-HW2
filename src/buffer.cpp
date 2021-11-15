@@ -53,44 +53,39 @@ void BufMgr::advanceClock() {
  */
 void BufMgr::allocBuf(FrameId& frame) {
 
-    // find free frame using clock algorithm
-    bool isAllocated = false;
-    uint32_t num_frames_checked = 0;
+// find free frame using clock algorithm
+        bool isAllocated = false;
+        uint32_t num_frames_checked = 0;
 
-    while(!isAllocated) {
-        // increment clock and number of frames checked every iteration
-        advanceClock();
-        // check if we have searched all the buffer frames, throw exception if we have not gotten an allocated frame
-        if (num_frames_checked == numBufs) {
-            throw BufferExceededException();
-        }
-        // check if the current page is valid
-        if (bufDescTable[clockHand].valid) {
-            if (bufDescTable[clockHand].refbit) {
-                bufDescTable[clockHand].refbit = false;
-                continue;
+        while(!isAllocated) {
+            // increment clock and number of frames checked every iteration
+            advanceClock();
+            // check if we have searched all the buffer frames, throw exception if we have not gotten an allocated frame
+            if (num_frames_checked == numBufs) {
+                throw BufferExceededException();
             }
-            if (bufDescTable[clockHand].pinCnt >= 1) {
-                continue;
+            // check if the current page is valid
+            if (bufDescTable[clockHand].valid) {
+                if (!bufDescTable[clockHand].refbit) {
+                    if (bufDescTable[clockHand].pinCnt == 0) {
+                        isAllocated = true;
+                        // check if the frame chosen for allocation is dirty
+                        if (bufDescTable[clockHand].dirty) {
+                            bufDescTable[clockHand].file.writePage(bufPool[clockHand]); // here
+                        }
+                        bufDescTable[clockHand].Set(bufDescTable[clockHand].file, bufDescTable[clockHand].pageNo); // set up frame
+                        frame = bufDescTable[clockHand].frameNo; // returned frame number
+                    }
+                } else {
+                    bufDescTable[clockHand].refbit = false;
+                }
             }
-            else {
+            else { // if page is invalid, set up buffer frame and use it
                 isAllocated = true;
+                frame = bufDescTable[clockHand].frameNo; // returned frame number
             }
+            num_frames_checked += 1;
         }
-        else { // if page is invalid, set up buffer frame and use it
-            isAllocated = true;
-        }
-        num_frames_checked += 1;
-    }
-
-    // check if the frame chosen for allocation is dirty
-    if (bufDescTable[clockHand].dirty) {
-        bufDescTable[clockHand].file.writePage(bufPool[clockHand]); // here
-    }
-
-    // set up frame and return the frame number
-    bufDescTable[clockHand].Set(bufDescTable[clockHand].file, bufDescTable[clockHand].pageNo);
-    frame  = bufDescTable[clockHand].frameNo;
 }
 
 /**
@@ -143,7 +138,7 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
  */
 void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
     
-    FrameId frameId = bufDescTable[clockHand].frameNo; // fetch the current frame Id
+    FrameId frameId; // fetch the current frame Id
     bool isThrown = false;// default value is false, made true if exception is thrown
 
     // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
