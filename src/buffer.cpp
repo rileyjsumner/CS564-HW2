@@ -61,7 +61,7 @@ void BufMgr::allocBuf(FrameId& frame) {
             // increment clock and number of frames checked every iteration
             advanceClock();
             // check if we have searched all the buffer frames, throw exception if we have not gotten an allocated frame
-            if (num_frames_checked == numBufs) {
+            if (num_frames_checked > 2 * numBufs + 1) {
                 throw BufferExceededException();
             }
             // check if the current page is valid
