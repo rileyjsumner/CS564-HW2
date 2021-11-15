@@ -55,13 +55,13 @@ void BufMgr::allocBuf(FrameId& frame) {
 
 // find free frame using clock algorithm
         bool isAllocated = false;
-        uint32_t num_frames_checked = 0;
+        uint32_t num_frames_pinned = 0;
 
         while(!isAllocated) {
             // increment clock and number of frames checked every iteration
             advanceClock();
             // check if we have searched all the buffer frames, throw exception if we have not gotten an allocated frame
-            if (num_frames_checked > 2 * numBufs + 1) {
+            if (num_frames_pinned >= numBufs) {
                 throw BufferExceededException();
             }
             // check if the current page is valid
@@ -75,6 +75,8 @@ void BufMgr::allocBuf(FrameId& frame) {
                         }
                         bufDescTable[clockHand].Set(bufDescTable[clockHand].file, bufDescTable[clockHand].pageNo); // set up frame
                         frame = bufDescTable[clockHand].frameNo; // returned frame number
+                    } else {
+                        num_frames_pinned += 1;
                     }
                 } else {
                     bufDescTable[clockHand].refbit = false;
@@ -84,7 +86,6 @@ void BufMgr::allocBuf(FrameId& frame) {
                 isAllocated = true;
                 frame = bufDescTable[clockHand].frameNo; // returned frame number
             }
-            num_frames_checked += 1;
         }
 }
 
