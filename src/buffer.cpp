@@ -72,9 +72,12 @@ void BufMgr::allocBuf(FrameId& frame) {
                         // check if the frame chosen for allocation is dirty
                         if (bufDescTable[clockHand].dirty) {
                             bufDescTable[clockHand].file.writePage(bufPool[clockHand]); // here
+                        } else {
+                            bufDescTable[clockHand].clear();
                         }
                         bufDescTable[clockHand].Set(bufDescTable[clockHand].file, bufDescTable[clockHand].pageNo); // set up frame
                         frame = bufDescTable[clockHand].frameNo; // returned frame number
+                        hashTable.remove(bufDescTable[clockHand].file, bufDescTable[clockHand].pageNo);
                     } else {
                         num_frames_pinned += 1;
                     }
@@ -87,6 +90,7 @@ void BufMgr::allocBuf(FrameId& frame) {
                 frame = bufDescTable[clockHand].frameNo; // returned frame number
             }
         }
+
 }
 
 /**
@@ -182,22 +186,23 @@ void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
 
     // allocate the new page and then get the page number from it
     Page newPage = file.allocatePage(); // here
-    pageNo = newPage.page_number(); // here
+    // pageNo = newPage.page_number(); // here
 
     // add the page in the proper buffer frame and set the page pointer to this new page in the buffer
     bufPool[frameNo] = newPage;
     page = &bufPool[frameNo];
+    pageNo = bufPool[frameNo].page_number();
 
     // call set function to set up new frame in buffer
     bufDescTable[frameNo].Set(file, pageNo);
 
     //finally insert into hashtable, catching any exceptions
-
-    try {
-        hashTable.insert(file, pageNo, frameNo); // here
-    } catch (InsufficientSpaceException const&) {
-        // do nothing if insufficient space
-    }
+//    try {
+//        hashTable.insert(file, pageNo, frameNo); // here
+//    } catch (InsufficientSpaceException const&) {
+//        // do nothing if insufficient space
+//    }
+    hashTable.insert(file, pageNo, frameNo); // here
 }
 
 /**
