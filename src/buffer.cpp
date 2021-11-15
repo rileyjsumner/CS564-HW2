@@ -100,10 +100,10 @@ void BufMgr::allocBuf(FrameId& frame) {
  * Returns the pointer to the page being retrieved
  */
 void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
-    
+
     FrameId frameId; // fetch the current frame Id
     bool isThrown = false; // default value is false, made true if exception is thrown
-    
+
     // wrapping the page-fetching process inside a try-catch block to deal with the case when the page is not found
     try {
         // fetch pointer to page we're trying to read
@@ -114,17 +114,17 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
         allocBuf(frameId);
         Page pageTemp = file.readPage(pageNo);
         bufPool[frameId] = pageTemp;
-        hashTable.insert(file, pageNo, frameId); // here
         bufDescTable[frameId].Set(file, pageNo);
+        hashTable.insert(file, pageNo, frameId); // here
         isThrown = true; // change isThrown to true
     }
-    
+
     if(!isThrown) {
         // increase pin count by 1 and change refbit to true if this requested page is already present in the buffer pool
         bufDescTable[frameId].pinCnt++;
         bufDescTable[frameId].refbit = true;
     }
-    
+
     // return pointer to the page being retrieved
     page = &bufPool[frameId];
 }
@@ -138,7 +138,7 @@ void BufMgr::readPage(File& file, const PageId pageNo, Page*& page) {
  * @throws PageNotPinnedException thrown if the page's pin count is already 0
  */
 void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
-    
+
     FrameId frameId; // fetch the current frame Id
     bool isThrown = false;// default value is false, made true if exception is thrown
 
@@ -150,7 +150,7 @@ void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
         // page not found, we indicate that an exception has been thrown to run appropriate code accordingly
         isThrown = true; // set isThrown to true
     }
-    
+
     // only runs if the suggested page to unpin exists, otherwise the function terminates here
     if(!isThrown) {
         // if page isn't pinned, throw PageNotPinnedException...
@@ -176,13 +176,13 @@ void BufMgr::unPinPage(File& file, const PageId pageNo, const bool dirty) {
  */
 void BufMgr::allocPage(File& file, PageId& pageNo, Page*& page) {
 
-    // allocate the new page and then get the page number from it
-    Page newPage = file.allocatePage(); // here
-    pageNo = newPage.page_number(); // here
-
     // create frameId store frame number returned from allocation in buffer
     FrameId frameNo;
     allocBuf(frameNo) ;// I think this is how I'm supposed to do this...
+
+    // allocate the new page and then get the page number from it
+    Page newPage = file.allocatePage(); // here
+    pageNo = newPage.page_number(); // here
 
     // add the page in the proper buffer frame and set the page pointer to this new page in the buffer
     bufPool[frameNo] = newPage;
